@@ -17,13 +17,15 @@ using Core.Interfaces;
 using Core.Contracts;
 using System.IO;
 using SixLabors.ImageSharp.PixelFormats;
+using CoreAdapters.Interfaces.Configuration;
+using CoreAdapters.Configuration;
 
 namespace WorkerService
 {
-    public class ImageProcessingService : BackgroundService
+    public class OLDImageProcessingService : BackgroundService
     {
         private readonly string _rabbitMqHost = "localhost";
-        private readonly ILogger<ImageProcessingService> _logger;
+        private readonly ILogger<OLDImageProcessingService> _logger;
         private readonly IMinioClient _minioClient;
         private IConnection _connection;
         private IModel _model;
@@ -39,17 +41,16 @@ namespace WorkerService
         private readonly string _minioSecretKey = "minioadmin";
         private readonly string MINIO_NOT_FORMATTED_IMAGES = "minhas-imagens";
         private readonly string _minioBucketName = "processed-images";
+        private readonly IRabbitMQConnectionService _rabbitMQConnectionService;
 
 
-
-        public ImageProcessingService(IMinioClient minioClient, ILogger<ImageProcessingService> logger, IFilterService filterService)
+        public OLDImageProcessingService(IMinioClient minioClient, IRabbitMQConnectionService rabbitMQConnectionService, ILogger<OLDImageProcessingService> logger, IFilterService filterService)
         {
             _logger = logger;
             _filterService = filterService;
             _minioClient = minioClient;
 
-            while (!_isConnected)
-                InitializeRabbitMQ();
+            _rabbitMQConnectionService = rabbitMQConnectionService;
 
             MinioBucketHandler();
         }
@@ -111,8 +112,9 @@ namespace WorkerService
 
                     try
                     {
+
                         var request = JsonConvert.DeserializeObject<ImageProcessingRequest>(message);
-                        await ProcessImageAsync(request);
+                        await ProcessImageAsync(request,ea.DeliveryTag);
                         _model.BasicAck(deliveryTag: ea.DeliveryTag, multiple: true);
                     }
                     catch (Exception ex)
@@ -136,7 +138,7 @@ namespace WorkerService
 
         }
 
-        private async Task ProcessImageAsync(ImageProcessingRequest request)
+        private async Task ProcessImageAsync(ImageProcessingRequest request, ulong deliveryTag)
         {
             var imageName = Path.GetFileName(request.ImageUrl);
             string imagePath = Path.Combine(Directory.GetCurrentDirectory(), imageName);

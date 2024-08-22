@@ -1,10 +1,29 @@
 using Minio;
+using CoreAdapters.Extensions;
+using ImageProcessingAPI.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-builder.Services.AddControllers();
+builder.Services.AddApiConfiguration(builder.Configuration);
+
+/*
+ * builder.Services.AddControllers();
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Total",
+        builder =>
+            builder
+                .AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader());
+});
+
+
+builder.Services.AddMinioConfigurations();
+
 
 string endpoint = Environment.GetEnvironmentVariable("MINIO_ENDPOINT");
 string accessKey = Environment.GetEnvironmentVariable("MINIO_ACCESS_KEY");
@@ -22,12 +41,14 @@ builder.Services.AddMinio(configureClient => configureClient
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen();*/
 
 var app = builder.Build();
 
+app.UseApiConfiguration(builder.Environment);
+
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+/*if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
       app.UseSwaggerUI(c =>
@@ -41,6 +62,6 @@ app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
-app.MapControllers();
+app.MapControllers();*/
 
 app.Run();

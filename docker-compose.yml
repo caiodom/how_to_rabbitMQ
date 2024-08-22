@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   app:
-    build: ./WorkerService
+    build:
+      context: .
+      dockerfile: WorkerService/Dockerfile
     container_name: image-processor-app
     user: 0:0
     environment:
@@ -23,7 +25,9 @@ services:
   
 
   webapi:
-    build: ./ImageProcessingAPI
+    build:
+      context: .
+      dockerfile: ImageProcessingAPI/Dockerfile
     container_name: image-processing-api
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
@@ -38,6 +42,7 @@ services:
     depends_on:
       - rabbitmq
       - minio
+      - app
     networks:
       - app-network
 

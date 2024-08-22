@@ -1,4 +1,7 @@
 ﻿using Core.Contracts;
+using CoreAdapters.Configuration;
+using CoreAdapters.Extensions;
+using CoreAdapters.Interfaces.Configuration;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using Minio;
@@ -17,50 +20,48 @@ namespace ImageProcessingAPI.Controllers
         private readonly ILogger<ImageProcessingController> _logger;
         private IMinioClient _minioClient;
         private const string BucketName = "minhas-imagens";
+        private readonly string MINIO_NOT_PROCESSED_IMAGES = "minhas-imagens";
         private readonly IConnection _connection;
         private readonly IModel _channel;
         private const string ExchangeName = "image_processing_exchange";
         private const string RoutingKey = "image.process";
         private const string MINIO_PROCCESSED_IMAGES = "processed-images";
 
-        public ImageProcessingController(IMinioClient minioClient, ILogger<ImageProcessingController> logger)
+        public ImageProcessingController(IMinioClient minioClient, IRabbitMQConnectionService rabbitMQConnectionService, ILogger<ImageProcessingController> logger)
         {
             _logger = logger;
-
-            // Configura o RabbitMQ
-            var factory = new ConnectionFactory() { HostName = "rabbitmq" }; // Use o nome do serviço RabbitMQ definido no Docker Compose
-            _connection = factory.CreateConnection();
+            _connection = rabbitMQConnectionService.GetConnection();
             _channel = _connection.CreateModel();
-
-            // Declara a exchange e a fila, caso ainda não existam
-            _channel.ExchangeDeclare(exchange: ExchangeName, type: ExchangeType.Direct);
-
-
             _minioClient = minioClient;
-            //InitializeMinioClient();
+
+            //MinioBucketHandler();
+
         }
 
         [HttpPost]
         [Route("process")]
         public async Task<IActionResult> ProcessImage(IFormFile image, string filterType)
         {
+
+           await  MinioConfigExtensions.MinioBucketHandler(_minioClient, MINIO_NOT_PROCESSED_IMAGES);
+
             if (image == null || string.IsNullOrEmpty(filterType))
             {
                 return BadRequest("Invalid image or filter type.");
             }
 
-            string imageName = image.FileName;
+            
+            var codigoImagem = Guid.NewGuid();
+            string imageName = $"{codigoImagem}_{image.FileName}";
+
 
             try
             {
-
-                await MinioBucketHandler();
-
                 // Faz o upload da imagem diretamente do IFormFile para o MinIO
                 using (var stream = image.OpenReadStream())
                 {
                     await _minioClient.PutObjectAsync(new PutObjectArgs()
-                        .WithBucket(MINIO_PROCCESSED_IMAGES)
+                        .WithBucket(MINIO_NOT_PROCESSED_IMAGES)
                         .WithObject(imageName)
                         .WithStreamData(stream)
                         .WithObjectSize(image.Length)
@@ -75,12 +76,21 @@ namespace ImageProcessingAPI.Controllers
                     ContentType=image.ContentType
                 };
 
-                var buckets = await _minioClient.ListBucketsAsync();
+                //var buckets = await _minioClient.ListBucketsAsync();
 
                 var messageBody = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(message));
 
+                var properties = _channel.CreateBasicProperties();
+                    properties.Persistent = true;// Garante que a mensagem seja persistente
+
+
+
                 // Publica a mensagem no RabbitMQ
-                _channel.BasicPublish(exchange: ExchangeName, routingKey: RoutingKey, basicProperties: null, body: messageBody);
+                _channel.BasicPublish(exchange: ExchangeName,
+                                      routingKey: RoutingKey, 
+                                      basicProperties: properties, 
+                                      body: messageBody);
+
 
                 var processedImageName = $"processed_{filterType}_{imageName}";
                 return Ok(processedImageName);
@@ -103,12 +113,12 @@ namespace ImageProcessingAPI.Controllers
                 System.IO.MemoryStream streamToReturn = new System.IO.MemoryStream();
 
                 await _minioClient.GetObjectAsync(new GetObjectArgs()
-                  .WithBucket(MINIO_PROCCESSED_IMAGES)
-                 .WithObject(fileName)
-                 .WithCallbackStream((stream) =>
-                 {
-                     stream.CopyTo(streamToReturn);
-                 }));
+                                          .WithBucket(MINIO_PROCCESSED_IMAGES)
+                                          .WithObject(fileName)
+                                          .WithCallbackStream((stream) =>
+                                           {
+                                              stream.CopyTo(streamToReturn);
+                                           }));
 
                 if (!new FileExtensionContentTypeProvider().TryGetContentType(fileName, out var contentType))
                     contentType = "application/octet-stream";
@@ -122,17 +132,17 @@ namespace ImageProcessingAPI.Controllers
 
         }
 
-        private async Task MinioBucketHandler()
+        private void MinioBucketHandler()
         {
             //reformular em uma classe externa para aplicar o SOLID:
             var bktExistsArgs = new BucketExistsArgs().WithBucket(BucketName);
-            bool found = await _minioClient.BucketExistsAsync(bktExistsArgs);
+            bool found = _minioClient.BucketExistsAsync(bktExistsArgs).Result;
 
 
             if (!found)
             {
                 var makeBucketArgs = new MakeBucketArgs().WithBucket(BucketName);
-                await _minioClient.MakeBucketAsync(makeBucketArgs);
+                 _minioClient.MakeBucketAsync(makeBucketArgs).GetAwaiter().GetResult();
                 Console.WriteLine(BucketName + " created successfully");
             }
             else

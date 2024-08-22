@@ -12,6 +12,8 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["WorkerService/WorkerService.csproj", "WorkerService/"]
 COPY ["Core/Core.csproj", "Core/"]
+COPY ["CoreAdapters/CoreAdapters.csproj","CoreAdapters/"]
+
 RUN dotnet restore "./WorkerService/WorkerService.csproj"
 COPY . .
 WORKDIR "/src/WorkerService"
@@ -25,6 +27,7 @@ RUN dotnet publish "./WorkerService.csproj" -c $BUILD_CONFIGURATION -o /app/publ
 # This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
 FROM base AS final
 WORKDIR /app
-RUN chmod -R 755 /app/shared
+#RUN mkdir shared
+#RUN chmod -R 755 /shared
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "WorkerService.dll"]

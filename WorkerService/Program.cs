@@ -1,9 +1,13 @@
 ﻿using Core;
+using CoreAdapters.Extensions;
+using Core.Contracts;
 using Core.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Minio;
+using SixLabors.ImageSharp;
 using WorkerService;
 
 Host.CreateDefaultBuilder(args)
@@ -19,23 +23,14 @@ Host.CreateDefaultBuilder(args)
 
 static void Configure(HostBuilderContext hostContext,IServiceCollection services)
 {
-    services.AddHostedService<ImageProcessingService>();
 
     services.AddSingleton<IFilterService, FilterService>();
+    services.AddMinioConfigurations();
 
-    string endpoint = Environment.GetEnvironmentVariable("MINIO_ENDPOINT");
-    string accessKey = Environment.GetEnvironmentVariable("MINIO_ACCESS_KEY");
-    string secretKey = Environment.GetEnvironmentVariable("MINIO_SECRET_KEY");
-    bool useSSL = bool.TryParse(Environment.GetEnvironmentVariable("MINIO_USE_SSL"), out useSSL);
+    services.Configure<RabbitMQSettings>(hostContext.Configuration.GetSection("RabbitMQ"));
+    services.AddRabbitMQConfigurations();
 
-   /* // Add Minio using the default endpoint
-    services.AddMinio(accessKey, secretKey);*/
 
-    // Add Minio using the custom endpoint and configure additional settings for default MinioClient initialization
-    services.AddMinio(configureClient => configureClient
-        .WithEndpoint(endpoint)
-        .WithCredentials(accessKey, secretKey)
-        .WithTimeout(TimeSpan.FromMinutes(5).Minutes)
-        .WithSSL(false)
-        .Build());
+    services.AddHostedService<ImageProcessingService>();
+
 }
