@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 using Minio;
 using SixLabors.ImageSharp;
 using WorkerService;
+using Microsoft.Extensions.Configuration;
 
 Host.CreateDefaultBuilder(args)
                 .ConfigureServices(Configure)
@@ -26,8 +27,10 @@ static void Configure(HostBuilderContext hostContext,IServiceCollection services
 
     services.AddSingleton<IFilterService, FilterService>();
     services.AddMinioConfigurations();
-
-    services.Configure<RabbitMQSettings>(hostContext.Configuration.GetSection("RabbitMQ"));
+    services.Configure<RabbitMQSettings>(hostContext.Configuration.GetSection("RabbitMQ:RabbitMQConnection"));
+    services.Configure<RabbitMQProcessSettings>(hostContext.Configuration.GetSection("RabbitMQ:RabbitMQProcess"));
+    services.Configure<MinioBucketSettings>(hostContext.Configuration.GetSection("Minio"));
+    //services.Configure<RabbitMQSettings>(hostContext.Configuration.GetSection("RabbitMQ:RabbitMQConnection"));
     services.AddRabbitMQConfigurations();
 
 

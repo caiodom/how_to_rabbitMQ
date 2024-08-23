@@ -21,41 +21,48 @@ using CoreAdapters.Interfaces.Configuration;
 using CoreAdapters.Extensions;
 using Polly;
 using RabbitMQ.Client.Exceptions;
+using Microsoft.Extensions.Options;
 
 namespace WorkerService
 {
     public class ImageProcessingService : BackgroundService
     {
-        private readonly string _rabbitMqHost = "localhost";
+
         private readonly ILogger<ImageProcessingService> _logger;
         private readonly IMinioClient _minioClient;
         private IConnection _connection;
         private IModel _model;
-        private bool _isConnected = false;
-        private const string EXCHANGE_NAME = "image_processing_exchange";
-        private const string QUEUE_NAME = "image_processing_queue";
-        private const string ROUTING_KEY = "image.process";
-
-        private readonly IFilterService _filterService;
-        private readonly object _channelLock = new object();
-        private readonly string _minioEndpoint = "localhost:9000";
-        private readonly string _minioAccessKey = "minioadmin";
-        private readonly string _minioSecretKey = "minioadmin";
-        private readonly string MINIO_NOT_PROCESSED_IMAGES = "minhas-imagens";
-        private readonly string MINIO_PROCESSED_IMAGES = "processed-images";
-
         private readonly IRabbitMQConnectionService _rabbitMQConnectionService;
+        private readonly IFilterService _filterService;
+
+        private readonly string EXCHANGE_NAME;
+        private readonly string QUEUE_NAME;
+        private readonly string ROUTING_KEY;
+        private readonly string MINIO_NOT_PROCESSED_IMAGES;
+        private readonly string MINIO_PROCESSED_IMAGES;
+
+        
 
 
 
-        public ImageProcessingService(IMinioClient minioClient, IRabbitMQConnectionService rabbitMQConnectionService, ILogger<ImageProcessingService> logger, IFilterService filterService)
+        public ImageProcessingService(IMinioClient minioClient, 
+                                      IOptions<MinioBucketSettings> minioBucketsConfig,
+                                      IOptions<RabbitMQProcessSettings> rabbitMQConfigSettings, 
+                                      IRabbitMQConnectionService rabbitMQConnectionService, 
+                                      ILogger<ImageProcessingService> logger, 
+                                      IFilterService filterService)
         {
             _logger = logger;
             _filterService = filterService;
             _minioClient = minioClient;
             _rabbitMQConnectionService = rabbitMQConnectionService;
-            
-            //_model = BuildModel();
+
+            EXCHANGE_NAME = rabbitMQConfigSettings.Value.ExchangeName;
+            QUEUE_NAME = rabbitMQConfigSettings.Value.QueueName;
+            ROUTING_KEY=rabbitMQConfigSettings.Value.RoutingKey;
+            MINIO_NOT_PROCESSED_IMAGES= minioBucketsConfig.Value.MinioBucketNotProcessedImages;
+            MINIO_PROCESSED_IMAGES=minioBucketsConfig.Value.MinioBucketProcessedImages;
+
 
         }
 
@@ -63,7 +70,8 @@ namespace WorkerService
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            await MinioBucketHandler();
+            await MinioConfigExtensions.MinioBucketHandler(_minioClient, MINIO_PROCESSED_IMAGES);
+
             _model = this.BuildModel();
 
             var consumer = this.BuildConsumer();
@@ -108,55 +116,6 @@ namespace WorkerService
 
             return _model;
         }
-
-
-        /*protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-        {
-            await MinioConfigExtensions.MinioBucketHandler(_minioClient, MINIO_PROCESSED_IMAGES); //MinioBucketHandler();
-
-            //while (!stoppingToken.IsCancellationRequested)
-            //{
-                var consumer = new AsyncEventingBasicConsumer(_model);
-
-                consumer.Received += async (model, ea) =>
-                {
-                    var body = ea.Body.ToArray();
-                    var message = Encoding.UTF8.GetString(body);
-
-                    _logger.LogInformation($"Received message: {message}");
-
-                    try
-                    {
-                        var request = JsonConvert.DeserializeObject<ImageProcessingRequest>(message);
-                        await ProcessImageAsync(request);
-
-                            _model.BasicAck(deliveryTag: ea.DeliveryTag, multiple: true);
-
-                    }
-                    catch (Exception ex)
-                    {
-                        _model.BasicNack(deliveryTag: ea.DeliveryTag, multiple: false, requeue: false);
-                        _logger.LogError($"Error processing message: {message}. Error: {ex.Message}");
-
-                    }
-
-                };
-
-                _model.BasicConsume(queue: QUEUE_NAME,
-                                    autoAck: false,
-                                    consumer: consumer);
-
-
-
-            _logger.LogInformation("Started consuming RabbitMQ queue.");
-
-              //  await Task.Delay(1000, stoppingToken);
-
-            //}
-
-        }*/
-
-
 
 
         private async Task ProcessImageAsync(ImageProcessingRequest request)
@@ -230,8 +189,7 @@ namespace WorkerService
 
             try
             {
-
-                var request = JsonConvert.DeserializeObject<ImageProcessingRequest>(message);
+                var request = JsonConvert.DeserializeObject<ImageProcessingRequest>(message) ?? throw new InvalidOperationException("request não pode ser nula!");
                 await ProcessImageAsync(request);
                 open = _model.IsOpen;
                 _model.BasicAck(deliveryTag: receivedItem.DeliveryTag, multiple:false);

@@ -1,5 +1,7 @@
 ﻿using CoreAdapters.Extensions;
 using Core.Contracts;
+using ImageProcessingAPI.Services;
+using ImageProcessingAPI.Services.Interfaces;
 
 namespace ImageProcessingAPI.Configuration
 {
@@ -23,16 +25,20 @@ namespace ImageProcessingAPI.Configuration
             });
 
 
-            services.AddMinioConfigurations();
-            services.Configure<RabbitMQSettings>(configuration.GetSection("RabbitMQ"));
-            services.AddRabbitMQConfigurations();
+            services.Configure<RabbitMQSettings>(configuration.GetSection("RabbitMQ:RabbitMQConnection"));
+            services.Configure<RabbitMQProcessSettings>(configuration.GetSection("RabbitMQ:RabbitMQProcess"));
+            services.Configure<MinioBucketSettings>(configuration.GetSection("Minio"));
 
+            services.AddScoped<IImageProcessingService, ImageProcessingService>();
+
+            services.AddMinioConfigurations();
+            services.AddRabbitMQConfigurations();
 
             services.AddEndpointsApiExplorer();
             services.AddSwaggerGen();
         }
 
-
+        //Middlewares
         public static void UseApiConfiguration(this IApplicationBuilder app, IWebHostEnvironment env)
         {
             if (env.IsDevelopment())
