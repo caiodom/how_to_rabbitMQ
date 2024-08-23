@@ -22,13 +22,11 @@ namespace ImageProcessingAPI.Controllers
         private readonly ILogger<ImageProcessingController> _logger;
         private readonly IImageProcessingService _imageProcessingService;
 
-
         public ImageProcessingController(IImageProcessingService imageProcessingService,
                                          ILogger<ImageProcessingController> logger)
         {
             _logger = logger;
             _imageProcessingService = imageProcessingService;
-
         }
 
         [HttpPost]
@@ -37,7 +35,6 @@ namespace ImageProcessingAPI.Controllers
         {
             try
             {
-
                 if (image == null || string.IsNullOrEmpty(filterType))
                     return BadRequest("Invalid image or filter type.");
 

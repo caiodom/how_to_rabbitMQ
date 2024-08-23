@@ -35,7 +35,7 @@ namespace CoreAdapters.Utils
         {
             return contentType.ToLower() switch
             {
-                string ct when (ct.Contains("jpeg")) => ImageFormat.Jpeg,
+                string ct when (ct.Contains("jpeg") || ct.Contains("jpg")) => ImageFormat.Jpeg,
                 string ct when (ct.Contains("png")) => ImageFormat.Png,
                 string ct when (ct.Contains("gif")) => ImageFormat.Gif,
                 string ct when (ct.Contains("bmp")) => ImageFormat.Bmp,

@@ -19,7 +19,7 @@ namespace CoreAdapters.Configuration
     {
         private IConnectionFactory _connectionFactory;
         private readonly RabbitMQSettings _settings;
-        private int _retryCount = 8;
+        private readonly int _retryCount = 8;
         private IConnection _connection;
 
         public RabbitMQConnectionService(RabbitMQSettings settings)
@@ -27,9 +27,6 @@ namespace CoreAdapters.Configuration
             _settings = settings;
             Connect();
         }
-
-
-
 
 
         public IConnection GetConnection()

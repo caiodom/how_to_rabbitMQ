@@ -10,8 +10,6 @@ namespace ImageProcessingAPI.Configuration
         private const string CORS_NAME = "Total";
         public static void AddApiConfiguration(this IServiceCollection services, IConfiguration configuration)
         {
-            // Add services to the container.
-
             services.AddControllers();
 
             services.AddCors(options =>

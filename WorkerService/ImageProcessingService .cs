@@ -127,7 +127,6 @@ namespace WorkerService
             MemoryStream streamToReturn = new MemoryStream();
 
             await _minioClient.GetObjectAsync(new GetObjectArgs()
-                //.WithBucket(_minioBucketName)
                 .WithBucket(MINIO_NOT_PROCESSED_IMAGES)
                 .WithObject(imageName)
                 .WithCallbackStream((stream) =>
@@ -204,25 +203,6 @@ namespace WorkerService
 
         }
 
-
-        private async Task MinioBucketHandler()
-        {
-            //reformular em uma classe externa para aplicar o SOLID:
-            var bktExistsArgs = new BucketExistsArgs().WithBucket(MINIO_PROCESSED_IMAGES);
-            bool found = await _minioClient.BucketExistsAsync(bktExistsArgs);
-
-
-            if (!found)
-            {
-                var makeBucketArgs = new MakeBucketArgs().WithBucket(MINIO_PROCESSED_IMAGES);
-                await _minioClient.MakeBucketAsync(makeBucketArgs);
-                Console.WriteLine(MINIO_PROCESSED_IMAGES + " created successfully");
-            }
-            else
-            {
-                Console.WriteLine(MINIO_PROCESSED_IMAGES + " already existis.");
-            }
-        }
 
         private void WaitQueueCreation()
         {

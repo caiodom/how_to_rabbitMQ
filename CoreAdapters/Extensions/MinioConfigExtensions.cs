@@ -19,8 +19,6 @@ namespace CoreAdapters.Extensions
             string secretKey = Environment.GetEnvironmentVariable("MINIO_SECRET_KEY") ?? throw new InvalidOperationException("The MINIO_SECRET_KEY environment variable is not set or is null.");
             bool useSSL = bool.TryParse(Environment.GetEnvironmentVariable("MINIO_USE_SSL") ?? throw new InvalidOperationException("The MINIO_USE_SSL environment variable is not set or is null."), out useSSL);
 
-
-            // Add Minio using the custom endpoint and configure additional settings for default MinioClient initialization
             services.AddMinio(configureClient => configureClient
                 .WithEndpoint(endpoint)
                 .WithCredentials(accessKey, secretKey)

@@ -73,7 +73,6 @@ namespace Core
 
                     await image.SaveAsync(stream, encoder);
 
-                // Redefine a posição do stream para o início para futuras leituras
                 stream.Position = 0;
    
             }

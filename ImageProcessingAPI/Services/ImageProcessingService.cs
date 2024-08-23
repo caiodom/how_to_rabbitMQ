@@ -53,7 +53,6 @@ namespace ImageProcessingAPI.Services
             string imageName = $"{codigoImagem}_{image.FileName}";
 
 
-                // Faz o upload da imagem diretamente do IFormFile para o MinIO
                 using (var stream = image.OpenReadStream())
                 {
                     await _minioClient.PutObjectAsync(new PutObjectArgs()
@@ -64,7 +63,6 @@ namespace ImageProcessingAPI.Services
                         .WithContentType(image.ContentType));
                 }
 
-                // Cria a mensagem para o RabbitMQ com o caminho da imagem no MinIO e o tipo de filtro
                 var message = new ImageProcessingRequest
                 {
                     ImageUrl = imageName,
@@ -72,14 +70,11 @@ namespace ImageProcessingAPI.Services
                     ContentType = image.ContentType
                 };
 
-                //var buckets = await _minioClient.ListBucketsAsync();
                 var messageBody = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(message));
                 var properties = _channel.CreateBasicProperties();
                 properties.Persistent = true;// Garante que a mensagem seja persistente
 
 
-
-                // Publica a mensagem no RabbitMQ
                 _channel.BasicPublish(exchange: EXCHANGE_NAME,
                                       routingKey: ROUTING_KEY,
                                       basicProperties: properties,
