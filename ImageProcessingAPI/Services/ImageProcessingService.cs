@@ -97,8 +97,6 @@ namespace ImageProcessingAPI.Services
                                               stream.CopyTo(streamToReturn);
                                           }));
 
-                if (!new FileExtensionContentTypeProvider().TryGetContentType(fileName, out var contentType))
-                    contentType = "application/octet-stream";
 
                 return streamToReturn.ToArray();
 
