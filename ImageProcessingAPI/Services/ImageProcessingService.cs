@@ -1,18 +1,14 @@
 ﻿using Core.Contracts;
-using Core.Interfaces;
 using CoreAdapters.Extensions;
 using CoreAdapters.Interfaces.Configuration;
-using ImageProcessingAPI.Controllers;
 using ImageProcessingAPI.Services.Interfaces;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Options;
 using Minio;
 using Minio.DataModel.Args;
 using Newtonsoft.Json;
 using RabbitMQ.Client;
 using System.Text;
-using System.Threading.Channels;
+
 
 namespace ImageProcessingAPI.Services
 {

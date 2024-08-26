@@ -1,5 +1,3 @@
-using Minio;
-using CoreAdapters.Extensions;
 using ImageProcessingAPI.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);

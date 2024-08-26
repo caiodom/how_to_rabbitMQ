@@ -1,17 +1,9 @@
 ﻿using CoreAdapters.Interfaces.Configuration;
 using Core.Contracts;
-using Microsoft.VisualBasic;
 using Polly;
-using Polly.Retry;
-using Polly.Wrap;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Exceptions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime;
-using System.Text;
-using System.Threading.Tasks;
+
 
 namespace CoreAdapters.Configuration
 {
