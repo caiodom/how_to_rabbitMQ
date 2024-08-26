@@ -2,6 +2,8 @@
 using Core.Contracts;
 using ImageProcessingAPI.Services;
 using ImageProcessingAPI.Services.Interfaces;
+using Core.Interfaces;
+using CoreAdapters.Services;
 
 namespace ImageProcessingAPI.Configuration
 {
@@ -26,6 +28,8 @@ namespace ImageProcessingAPI.Configuration
             services.Configure<RabbitMQSettings>(configuration.GetSection("RabbitMQ:RabbitMQConnection"));
             services.Configure<RabbitMQProcessSettings>(configuration.GetSection("RabbitMQ:RabbitMQProcess"));
             services.Configure<MinioBucketSettings>(configuration.GetSection("Minio"));
+          
+            services.AddSingleton<IMinioServices, MinioServices>();
 
 
             services.AddScoped<IFileValidator, FileValidator>();

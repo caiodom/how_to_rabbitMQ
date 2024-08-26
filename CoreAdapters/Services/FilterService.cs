@@ -1,5 +1,6 @@
 ﻿using Core.Interfaces;
 using Core.Utils;
+using CoreAdapters.Utils;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Formats.Jpeg;
@@ -11,7 +12,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Core
+namespace CoreAdapters.Services
 {
     public class FilterService : IFilterService
     {

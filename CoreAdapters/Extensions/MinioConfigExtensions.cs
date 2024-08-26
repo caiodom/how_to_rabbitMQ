@@ -26,22 +26,6 @@ namespace CoreAdapters.Extensions
         }
 
 
-        public static async Task MinioBucketHandler(IMinioClient minioClient,string bucketName)
-        {
-            var bktExistsArgs = new BucketExistsArgs().WithBucket(bucketName);
-            bool found = await minioClient.BucketExistsAsync(bktExistsArgs);
-
-
-            if (!found)
-            {
-                var makeBucketArgs = new MakeBucketArgs().WithBucket(bucketName);
-                await minioClient.MakeBucketAsync(makeBucketArgs);
-                Console.WriteLine(bucketName + " created successfully");
-            }
-            else
-            {
-                Console.WriteLine(bucketName + " already existis.");
-            }
-        }
+        
     }
 }

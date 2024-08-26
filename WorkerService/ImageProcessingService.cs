@@ -12,6 +12,7 @@ using CoreAdapters.Interfaces.Configuration;
 using CoreAdapters.Extensions;
 using Microsoft.Extensions.Options;
 using Core.Utils;
+using CoreAdapters.Services;
 
 namespace WorkerService
 {
@@ -19,7 +20,7 @@ namespace WorkerService
     {
 
         private readonly ILogger<ImageProcessingService> _logger;
-        private readonly IMinioClient _minioClient;
+        private readonly IMinioServices _minioServices;
         private IConnection _connection;
         private IModel _model;
         private readonly IRabbitMQConnectionService _rabbitMQConnectionService;
@@ -35,7 +36,7 @@ namespace WorkerService
 
 
 
-        public ImageProcessingService(IMinioClient minioClient,
+        public ImageProcessingService(IMinioServices minioServices,
                                       IOptions<MinioBucketSettings> minioBucketsConfig,
                                       IOptions<RabbitMQProcessSettings> rabbitMQConfigSettings,
                                       IRabbitMQConnectionService rabbitMQConnectionService,
@@ -44,7 +45,7 @@ namespace WorkerService
         {
             _logger = logger;
             _filterService = filterService;
-            _minioClient = minioClient;
+            _minioServices = minioServices;
             _rabbitMQConnectionService = rabbitMQConnectionService;
 
             EXCHANGE_NAME = rabbitMQConfigSettings.Value.ExchangeName;
@@ -60,7 +61,6 @@ namespace WorkerService
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            await MinioConfigExtensions.MinioBucketHandler(_minioClient, MINIO_PROCESSED_IMAGES);
 
             _model = this.BuildModel();
 
@@ -113,15 +113,7 @@ namespace WorkerService
 
 
             MemoryStream streamToReturn = new MemoryStream();
-
-            await _minioClient.GetObjectAsync(new GetObjectArgs()
-                .WithBucket(MINIO_NOT_PROCESSED_IMAGES)
-                .WithObject(imageName)
-                .WithCallbackStream((stream) =>
-                {
-                    stream.CopyTo(streamToReturn);
-                }));
-
+            await _minioServices.GetObjectAsync(streamToReturn, MINIO_NOT_PROCESSED_IMAGES, imageName);
 
 
             File.WriteAllBytes(imagePath, streamToReturn.ToArray());
@@ -135,16 +127,20 @@ namespace WorkerService
 
             using var outputStream = new FileStream(imagePath, FileMode.Open);
 
-            await _minioClient.PutObjectAsync(new PutObjectArgs()
-                .WithBucket(MINIO_PROCESSED_IMAGES)
-                .WithObject(processedImageName)
-                .WithStreamData(outputStream)
-                .WithObjectSize(outputStream.Length)
-                .WithContentType(request.ContentType));
+            var response = await _minioServices.PutObjectAsync(MINIO_PROCESSED_IMAGES, processedImageName, outputStream, request.ContentType);
+
+
+            if (processedImageName != response.ToString())
+            {
+                _logger.LogInformation($"Error when image saved to MinIO: {processedImageName}");
+                return RabbitMQConsumeHandler.NACK;
+            }
+
 
             _logger.LogInformation($"Processed image uploaded to MinIO: {processedImageName}");
 
             File.Delete(imagePath);
+
 
             return RabbitMQConsumeHandler.ACK;
 

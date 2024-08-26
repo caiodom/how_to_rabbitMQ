@@ -1,10 +1,8 @@
 ﻿using Core.Contracts;
-using CoreAdapters.Extensions;
+using Core.Interfaces;
 using CoreAdapters.Interfaces.Configuration;
 using ImageProcessingAPI.Services.Interfaces;
 using Microsoft.Extensions.Options;
-using Minio;
-using Minio.DataModel.Args;
 using Newtonsoft.Json;
 using RabbitMQ.Client;
 using System.Text;
@@ -12,19 +10,19 @@ using System.Text;
 
 namespace ImageProcessingAPI.Services
 {
-    public class ImageProcessingService: IImageProcessingService
+    public class ImageProcessingService : IImageProcessingService
     {
-        private readonly IMinioClient _minioClient;
         private readonly IConnection _connection;
         private readonly IModel _channel;
         private readonly IFileValidator _fileValidator;
+        private readonly IMinioServices _minioServices;
         private readonly string EXCHANGE_NAME;
         private readonly string QUEUE_NAME;
         private readonly string ROUTING_KEY;
         private readonly string MINIO_NOT_PROCESSED_IMAGES;
         private readonly string MINIO_PROCESSED_IMAGES;
 
-        public ImageProcessingService(IMinioClient minioClient,
+        public ImageProcessingService(IMinioServices minioServices,
                                          IRabbitMQConnectionService rabbitMQConnectionService,
                                          IOptions<MinioBucketSettings> minioBucketsConfig,
                                          IOptions<RabbitMQProcessSettings> rabbitMQConfigSettings,
@@ -33,8 +31,8 @@ namespace ImageProcessingAPI.Services
 
             _connection = rabbitMQConnectionService.GetConnection();
             _channel = _connection.CreateModel();
-            _minioClient = minioClient;
-            _fileValidator= fileValidator;
+            _minioServices = minioServices;
+            _fileValidator = fileValidator;
 
             EXCHANGE_NAME = rabbitMQConfigSettings.Value.ExchangeName;
             QUEUE_NAME = rabbitMQConfigSettings.Value.QueueName;
@@ -49,61 +47,48 @@ namespace ImageProcessingAPI.Services
             if (!_fileValidator.IsValid(image))
                 throw new InvalidOperationException("Unsupported file format.");
 
-
-            await MinioConfigExtensions.MinioBucketHandler(_minioClient, MINIO_NOT_PROCESSED_IMAGES);
-
             var codigoImagem = Guid.NewGuid();
             string imageName = $"{codigoImagem}_{image.FileName}";
 
 
-                using (var stream = image.OpenReadStream())
-                {
-                    await _minioClient.PutObjectAsync(new PutObjectArgs()
-                        .WithBucket(MINIO_NOT_PROCESSED_IMAGES)
-                        .WithObject(imageName)
-                        .WithStreamData(stream)
-                        .WithObjectSize(image.Length)
-                        .WithContentType(image.ContentType));
-                }
+            using (var stream = image.OpenReadStream())
+            {
+                var response = await _minioServices
+                                        .PutObjectAsync(MINIO_NOT_PROCESSED_IMAGES,
+                                                        imageName,
+                                                        stream,
+                                                        image.ContentType);
+            }
 
-                var message = new ImageProcessingRequest
-                {
-                    ImageUrl = imageName,
-                    FilterType = filterType,
-                    ContentType = image.ContentType
-                };
+            var message = new ImageProcessingRequest
+            {
+                ImageUrl = imageName,
+                FilterType = filterType,
+                ContentType = image.ContentType
+            };
 
-                var messageBody = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(message));
-                var properties = _channel.CreateBasicProperties();
-                properties.Persistent = true;// Garante que a mensagem seja persistente
-
-
-                _channel.BasicPublish(exchange: EXCHANGE_NAME,
-                                      routingKey: ROUTING_KEY,
-                                      basicProperties: properties,
-                                      body: messageBody);
+            var messageBody = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(message));
+            var properties = _channel.CreateBasicProperties();
+            properties.Persistent = true;// Garante que a mensagem seja persistente
 
 
-                return $"processed_{filterType}_{imageName}";
+            _channel.BasicPublish(exchange: EXCHANGE_NAME,
+                                  routingKey: ROUTING_KEY,
+                                  basicProperties: properties,
+                                  body: messageBody);
+
+
+            return $"processed_{filterType}_{imageName}";
 
         }
         public async Task<byte[]> Download(string fileName)
         {
-
-               MemoryStream streamToReturn = new MemoryStream();
-
-                await _minioClient.GetObjectAsync(new GetObjectArgs()
-                                          .WithBucket(MINIO_PROCESSED_IMAGES)
-                                          .WithObject(fileName)
-                                          .WithCallbackStream((stream) =>
-                                          {
-                                              stream.CopyTo(streamToReturn);
-                                          }));
-
-
+            using (var streamToReturn = new MemoryStream())
+            {
+                await _minioServices.GetObjectAsync(streamToReturn,MINIO_PROCESSED_IMAGES, fileName);
                 return streamToReturn.ToArray();
-
-
+            }
+           
         }
     }
 }

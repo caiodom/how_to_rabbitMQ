@@ -8,6 +8,7 @@ using SixLabors.ImageSharp.Formats.Tga;
 using SixLabors.ImageSharp.Formats.Tiff;
 using SixLabors.ImageSharp.Formats.Webp;
 using SixLabors.ImageSharp.Formats;
+using Core.Utils;
 
 
 namespace CoreAdapters.Utils
