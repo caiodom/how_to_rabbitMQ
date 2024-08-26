@@ -111,7 +111,7 @@ namespace WorkerService
                              exchange: EXCHANGE_NAME,
                              routingKey: ROUTING_KEY);
 
-            _model.BasicQos(prefetchSize: 0, prefetchCount: 12000, global: false);
+            _model.BasicQos(prefetchSize: 0, prefetchCount: 10, global: false);
 
             return _model;
         }
