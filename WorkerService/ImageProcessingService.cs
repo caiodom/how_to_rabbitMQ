@@ -22,6 +22,7 @@ using CoreAdapters.Extensions;
 using Polly;
 using RabbitMQ.Client.Exceptions;
 using Microsoft.Extensions.Options;
+using Core.Utils;
 
 namespace WorkerService
 {
@@ -41,15 +42,15 @@ namespace WorkerService
         private readonly string MINIO_NOT_PROCESSED_IMAGES;
         private readonly string MINIO_PROCESSED_IMAGES;
 
-        
 
 
 
-        public ImageProcessingService(IMinioClient minioClient, 
+
+        public ImageProcessingService(IMinioClient minioClient,
                                       IOptions<MinioBucketSettings> minioBucketsConfig,
-                                      IOptions<RabbitMQProcessSettings> rabbitMQConfigSettings, 
-                                      IRabbitMQConnectionService rabbitMQConnectionService, 
-                                      ILogger<ImageProcessingService> logger, 
+                                      IOptions<RabbitMQProcessSettings> rabbitMQConfigSettings,
+                                      IRabbitMQConnectionService rabbitMQConnectionService,
+                                      ILogger<ImageProcessingService> logger,
                                       IFilterService filterService)
         {
             _logger = logger;
@@ -59,9 +60,9 @@ namespace WorkerService
 
             EXCHANGE_NAME = rabbitMQConfigSettings.Value.ExchangeName;
             QUEUE_NAME = rabbitMQConfigSettings.Value.QueueName;
-            ROUTING_KEY=rabbitMQConfigSettings.Value.RoutingKey;
-            MINIO_NOT_PROCESSED_IMAGES= minioBucketsConfig.Value.MinioBucketNotProcessedImages;
-            MINIO_PROCESSED_IMAGES=minioBucketsConfig.Value.MinioBucketProcessedImages;
+            ROUTING_KEY = rabbitMQConfigSettings.Value.RoutingKey;
+            MINIO_NOT_PROCESSED_IMAGES = minioBucketsConfig.Value.MinioBucketNotProcessedImages;
+            MINIO_PROCESSED_IMAGES = minioBucketsConfig.Value.MinioBucketProcessedImages;
 
 
         }
@@ -76,12 +77,10 @@ namespace WorkerService
 
             var consumer = this.BuildConsumer();
 
-            //this.WaitQueueCreation();
-
             string consumerTag = consumer
                                      .Model
-                                     .BasicConsume(queue: QUEUE_NAME, 
-                                                   autoAck: false, 
+                                     .BasicConsume(queue: QUEUE_NAME,
+                                                   autoAck: false,
                                                    consumer: consumer);
 
             while (!stoppingToken.IsCancellationRequested)
@@ -118,7 +117,7 @@ namespace WorkerService
         }
 
 
-        private async Task ProcessImageAsync(ImageProcessingRequest request)
+        private async Task<RabbitMQConsumeHandler> ProcessImageAsync(ImageProcessingRequest request)
         {
             var imageName = Path.GetFileName(request.ImageUrl);
             string imagePath = Path.Combine(Directory.GetCurrentDirectory(), imageName);
@@ -158,10 +157,9 @@ namespace WorkerService
 
             File.Delete(imagePath);
 
+            return RabbitMQConsumeHandler.ACK;
+
         }
-
-
-
 
         public IBasicConsumer BuildConsumer()
         {
@@ -175,65 +173,77 @@ namespace WorkerService
 
         private async Task Receive(object sender, BasicDeliverEventArgs receivedItem)
         {
-            if (receivedItem == null)
-                throw new ArgumentNullException(nameof(receivedItem));
+            RabbitMQConsumeHandler action = DeserializeHandler(receivedItem, out ImageProcessingRequest request);
 
-            var open = _model.IsOpen;
+            if (action is RabbitMQConsumeHandler.READY)
+            {
+                try
+                {
+                   action= await ProcessImageAsync(request);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Error processing request. Error: {ex.Message}");
+                    action=RabbitMQConsumeHandler.NACK;
+                }
 
+            }
 
-            var body = receivedItem.Body.ToArray();
-            var message = Encoding.UTF8.GetString(body);
+            ConsumerHandler(receivedItem,action);
 
-            _logger.LogInformation($"Received message: {message}");
+        }
 
+        private void ConsumerHandler(BasicDeliverEventArgs receivedItem,RabbitMQConsumeHandler rabbitMQConsumeHandler)
+        {
+            switch(rabbitMQConsumeHandler)
+            {
+                case RabbitMQConsumeHandler.READY: throw new InvalidOperationException("Invalid consumer action");
+                case RabbitMQConsumeHandler.ACK: _model.BasicAck(deliveryTag: receivedItem.DeliveryTag, multiple: false); break;
+                case RabbitMQConsumeHandler.NACK: _model.BasicNack(deliveryTag: receivedItem.DeliveryTag, multiple: false, requeue: false); break;
+                case RabbitMQConsumeHandler.REJECT:_model.BasicReject(deliveryTag: receivedItem.DeliveryTag, requeue: false); break;
+            }
+        }
+
+        private RabbitMQConsumeHandler DeserializeHandler(BasicDeliverEventArgs receivedItem, out ImageProcessingRequest request)
+        {
+            request = default;
             try
             {
-                var request = JsonConvert.DeserializeObject<ImageProcessingRequest>(message) ?? throw new InvalidOperationException("request não pode ser nula!");
-                await ProcessImageAsync(request);
-                open = _model.IsOpen;
-                _model.BasicAck(deliveryTag: receivedItem.DeliveryTag, multiple:false);
+                var message = ValidateBasicDeliverEventArgs(receivedItem);
+                _logger.LogInformation($"Received message: {message}");
+                request = JsonConvert.DeserializeObject<ImageProcessingRequest>(message);
 
+                if (request is null)
+                    throw new InvalidOperationException("Failed to deserialize the message. The message format may be incorrect or missing required fields.");
+
+                return RabbitMQConsumeHandler.READY;
             }
             catch (Exception ex)
             {
-
-                _model.BasicNack(deliveryTag: receivedItem.DeliveryTag, multiple: false, requeue: false);
-                _logger.LogError($"Error processing message: {message}. Error: {ex.Message}");
+                _logger.LogWarning("Message rejected during desserialization {ex}", ex);
+                return RabbitMQConsumeHandler.REJECT;
             }
 
         }
 
-
-        private void WaitQueueCreation()
+        private string ValidateBasicDeliverEventArgs(BasicDeliverEventArgs receivedItem)
         {
-            Policy
-                .Handle<OperationInterruptedException>()
-                .WaitAndRetry(5, retryAttempt =>
-                {
-                    TimeSpan timeToWait = TimeSpan.FromSeconds(Math.Pow(2, retryAttempt));
-                    _logger.LogWarning("Queue {queueName} not found... We will try in {tempo}.", QUEUE_NAME, timeToWait.TotalSeconds);
-                    return timeToWait;
+            if (receivedItem == null)
+                throw new ArgumentNullException(nameof(receivedItem));
 
-                }).Execute(() =>
-                {
-                    var open = _model.IsOpen;
-                    using IModel testModel = this.BuildModel();
-                    testModel.QueueDeclarePassive(QUEUE_NAME);
-                    open = _model.IsOpen;
+            var body = receivedItem.Body.ToArray();
 
+            if (body == null || body.Length == 0)
+                throw new InvalidOperationException("The message body is empty or null. Cannot process a message without content.");
 
-                });
+            var message = Encoding.UTF8.GetString(body);
 
+            if (message == null)
+                throw new InvalidOperationException("Failed to convert the message body to a string. Ensure the message content is properly encoded.");
 
-
+            return message;
         }
 
-        public override void Dispose()
-        {
-           /* _model.Close();
-            _connection.Close();
-            base.Dispose();*/
-        }
     }
 
 

@@ -21,6 +21,7 @@ namespace ImageProcessingAPI.Services
         private readonly IMinioClient _minioClient;
         private readonly IConnection _connection;
         private readonly IModel _channel;
+        private readonly IFileValidator _fileValidator;
         private readonly string EXCHANGE_NAME;
         private readonly string QUEUE_NAME;
         private readonly string ROUTING_KEY;
@@ -30,12 +31,14 @@ namespace ImageProcessingAPI.Services
         public ImageProcessingService(IMinioClient minioClient,
                                          IRabbitMQConnectionService rabbitMQConnectionService,
                                          IOptions<MinioBucketSettings> minioBucketsConfig,
-                                         IOptions<RabbitMQProcessSettings> rabbitMQConfigSettings)
+                                         IOptions<RabbitMQProcessSettings> rabbitMQConfigSettings,
+                                         IFileValidator fileValidator)
         {
 
             _connection = rabbitMQConnectionService.GetConnection();
             _channel = _connection.CreateModel();
             _minioClient = minioClient;
+            _fileValidator= fileValidator;
 
             EXCHANGE_NAME = rabbitMQConfigSettings.Value.ExchangeName;
             QUEUE_NAME = rabbitMQConfigSettings.Value.QueueName;
@@ -47,6 +50,10 @@ namespace ImageProcessingAPI.Services
 
         public async Task<string> ProcessImage(IFormFile image, string filterType)
         {
+            if (!_fileValidator.IsValid(image))
+                throw new InvalidOperationException("Unsupported file format.");
+
+
             await MinioConfigExtensions.MinioBucketHandler(_minioClient, MINIO_NOT_PROCESSED_IMAGES);
 
             var codigoImagem = Guid.NewGuid();
