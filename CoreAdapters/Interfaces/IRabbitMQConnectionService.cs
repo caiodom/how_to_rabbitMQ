@@ -3,7 +3,7 @@
 
 namespace CoreAdapters.Interfaces.Configuration
 {
-    public interface IRabbitMQConnectionService
+    public interface IRabbitMQConnectionService: IDisposable
     {
         IConnection GetConnection();
     }

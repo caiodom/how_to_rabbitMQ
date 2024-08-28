@@ -69,7 +69,7 @@ namespace ImageProcessingAPI.Services
 
             var messageBody = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(message));
             var properties = _channel.CreateBasicProperties();
-            properties.Persistent = true;// Garante que a mensagem seja persistente
+            properties.Persistent = true;
 
 
             _channel.BasicPublish(exchange: EXCHANGE_NAME,

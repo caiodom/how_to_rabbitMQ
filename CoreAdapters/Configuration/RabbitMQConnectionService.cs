@@ -9,7 +9,7 @@ namespace CoreAdapters.Configuration
 {
     public class RabbitMQConnectionService : IRabbitMQConnectionService
     {
-        private IConnectionFactory _connectionFactory;
+        private readonly ConnectionFactory _connectionFactory;
         private readonly RabbitMQSettings _settings;
         private readonly int _retryCount = 8;
         private IConnection _connection;
@@ -17,12 +17,20 @@ namespace CoreAdapters.Configuration
         public RabbitMQConnectionService(RabbitMQSettings settings)
         {
             _settings = settings;
+
+            _connectionFactory = new ConnectionFactory()
+            {
+                HostName = _settings.HostName,
+                Port = _settings.Port,
+                DispatchConsumersAsync = true
+            };
+
             Connect();
         }
 
-
         public IConnection GetConnection()
         {
+
             if (_connection == null || !_connection.IsOpen)
                 throw new InvalidOperationException("Conexão não esta aberta.");
 
@@ -31,12 +39,7 @@ namespace CoreAdapters.Configuration
 
         private void Connect()
         {
-            _connectionFactory = new ConnectionFactory()
-            {
-                HostName = _settings.HostName,
-                Port = _settings.Port,
-                DispatchConsumersAsync=true
-            };
+
 
 
             Policy
@@ -51,6 +54,17 @@ namespace CoreAdapters.Configuration
                 Console.Write("Conexão estabelecida com sucesso!");
             });
         }
+
+    
+        public void Dispose()
+        {
+            if (_connection != null && _connection.IsOpen)
+            {
+                _connection.Close();
+                _connection.Dispose();
+            }
+        }
+
 
     }
 }

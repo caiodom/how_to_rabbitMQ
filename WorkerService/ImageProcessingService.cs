@@ -21,7 +21,6 @@ namespace WorkerService
 
         private readonly ILogger<ImageProcessingService> _logger;
         private readonly IMinioServices _minioServices;
-        private IConnection _connection;
         private IModel _model;
         private readonly IRabbitMQConnectionService _rabbitMQConnectionService;
         private readonly IFilterService _filterService;
@@ -83,8 +82,8 @@ namespace WorkerService
         }
         private IModel BuildModel()
         {
-            _connection = _rabbitMQConnectionService.GetConnection();
-            _model = _connection.CreateModel();
+
+            _model = _rabbitMQConnectionService.GetConnection().CreateModel();
 
             _model.ExchangeDeclare(exchange: EXCHANGE_NAME,
                                    type: ExchangeType.Direct);
