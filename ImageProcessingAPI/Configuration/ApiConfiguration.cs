@@ -29,7 +29,7 @@ namespace ImageProcessingAPI.Configuration
             services.Configure<RabbitMQProcessSettings>(configuration.GetSection("RabbitMQ:RabbitMQProcess"));
             services.Configure<MinioBucketSettings>(configuration.GetSection("Minio"));
           
-            services.AddSingleton<IMinioServices, MinioServices>();
+            services.AddSingleton<IMinioService, MinioService>();
 
 
             services.AddScoped<IFileValidator, FileValidator>();

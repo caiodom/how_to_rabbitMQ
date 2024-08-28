@@ -1,6 +1,6 @@
 ﻿namespace Core.Interfaces
 {
-    public interface IMinioServices
+    public interface IMinioService
     {
         Task GetObjectAsync(MemoryStream memoryStream, string bucketName, string objectName);
 

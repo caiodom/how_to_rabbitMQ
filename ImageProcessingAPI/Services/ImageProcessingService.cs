@@ -15,14 +15,14 @@ namespace ImageProcessingAPI.Services
         private readonly IConnection _connection;
         private readonly IModel _channel;
         private readonly IFileValidator _fileValidator;
-        private readonly IMinioServices _minioServices;
+        private readonly IMinioService _minioServices;
         private readonly string EXCHANGE_NAME;
         private readonly string QUEUE_NAME;
         private readonly string ROUTING_KEY;
         private readonly string MINIO_NOT_PROCESSED_IMAGES;
         private readonly string MINIO_PROCESSED_IMAGES;
 
-        public ImageProcessingService(IMinioServices minioServices,
+        public ImageProcessingService(IMinioService minioServices,
                                          IRabbitMQConnectionService rabbitMQConnectionService,
                                          IOptions<MinioBucketSettings> minioBucketsConfig,
                                          IOptions<RabbitMQProcessSettings> rabbitMQConfigSettings,

@@ -26,10 +26,10 @@ static void Configure(HostBuilderContext hostContext,IServiceCollection services
     services.Configure<RabbitMQSettings>(hostContext.Configuration.GetSection("RabbitMQ:RabbitMQConnection"));
     services.Configure<RabbitMQProcessSettings>(hostContext.Configuration.GetSection("RabbitMQ:RabbitMQProcess"));
     services.Configure<MinioBucketSettings>(hostContext.Configuration.GetSection("Minio"));
-    services.AddMinioConfigurations();
+    //services.AddMinioConfigurations();
 
-    services.AddSingleton<IFilterService, FilterService>();
-    services.AddSingleton<IMinioServices, MinioServices>();
+    services.AddScoped<IFilterService, FilterService>();
+    services.AddSingleton<IMinioService, MinioService>();
 
     
     services.AddRabbitMQConfigurations();

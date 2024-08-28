@@ -39,9 +39,6 @@ namespace CoreAdapters.Configuration
 
         private void Connect()
         {
-
-
-
             Policy
             .Handle<BrokerUnreachableException>()
             .WaitAndRetry(_retryCount, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
@@ -55,15 +52,7 @@ namespace CoreAdapters.Configuration
             });
         }
 
-    
-        public void Dispose()
-        {
-            if (_connection != null && _connection.IsOpen)
-            {
-                _connection.Close();
-                _connection.Dispose();
-            }
-        }
+
 
 
     }

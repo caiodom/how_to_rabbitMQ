@@ -20,7 +20,7 @@ namespace WorkerService
     {
 
         private readonly ILogger<ImageProcessingService> _logger;
-        private readonly IMinioServices _minioServices;
+        private readonly IMinioService _minioServices;
         private IModel _model;
         private readonly IRabbitMQConnectionService _rabbitMQConnectionService;
         private readonly IFilterService _filterService;
@@ -35,7 +35,7 @@ namespace WorkerService
 
 
 
-        public ImageProcessingService(IMinioServices minioServices,
+        public ImageProcessingService(IMinioService minioServices,
                                       IOptions<MinioBucketSettings> minioBucketsConfig,
                                       IOptions<RabbitMQProcessSettings> rabbitMQConfigSettings,
                                       IRabbitMQConnectionService rabbitMQConnectionService,
@@ -83,25 +83,25 @@ namespace WorkerService
         private IModel BuildModel()
         {
 
-            _model = _rabbitMQConnectionService.GetConnection().CreateModel();
+            var model = _rabbitMQConnectionService.GetConnection().CreateModel();
 
-            _model.ExchangeDeclare(exchange: EXCHANGE_NAME,
+            model.ExchangeDeclare(exchange: EXCHANGE_NAME,
                                    type: ExchangeType.Direct);
 
-            _model.QueueDeclare(queue: QUEUE_NAME,
+            model.QueueDeclare(queue: QUEUE_NAME,
                                 durable: true,
                                 exclusive: false,
                                 autoDelete: false,
                                 arguments: null);
 
 
-            _model.QueueBind(queue: QUEUE_NAME,
+            model.QueueBind(queue: QUEUE_NAME,
                              exchange: EXCHANGE_NAME,
                              routingKey: ROUTING_KEY);
 
-            _model.BasicQos(prefetchSize: 0, prefetchCount: 10, global: false);
+            model.BasicQos(prefetchSize: 0, prefetchCount: 10, global: false);
 
-            return _model;
+            return model;
         }
 
 

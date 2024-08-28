@@ -1,40 +1,38 @@
-﻿using Core.Contracts;
-using Core.Interfaces;
-using Microsoft.Extensions.Options;
+﻿using Minio.DataModel.Args;
+using Minio.DataModel;
 using Minio;
-using Minio.DataModel.Args;
-using SixLabors.ImageSharp;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Minio.ApiEndpoints;
+using Core.Interfaces;
 
 namespace CoreAdapters.Services
 {
-    public class MinioServices: IMinioServices
+    public class MinioService: IMinioService
     {
-        private readonly IMinioClient _minioClient;
+        private IMinioClient _minioClient;
 
-
-        public MinioServices(IMinioClient minioClient)
+        // Construtor que inicializa o cliente do MinIO
+        public MinioService()
         {
-            _minioClient=minioClient;
+            Connect();
         }
 
-        public async Task GetObjectAsync(MemoryStream memoryStream,string bucketName, string objectName)
+        public async Task GetObjectAsync(MemoryStream memoryStream, string bucketName, string objectName)
         {
             await MinioBucketHandler(bucketName);
 
 
-                await _minioClient.GetObjectAsync(new GetObjectArgs()
-                    .WithBucket(bucketName)
-                    .WithObject(objectName)
-                    .WithCallbackStream((stream) =>
-                    {
-                        stream.CopyTo(memoryStream);
-                    }));
+            await _minioClient.GetObjectAsync(new GetObjectArgs()
+                .WithBucket(bucketName)
+                .WithObject(objectName)
+                .WithCallbackStream((stream) =>
+                {
+                    stream.CopyTo(memoryStream);
+                }));
         }
 
         //TODO:Resolve this
@@ -45,7 +43,7 @@ namespace CoreAdapters.Services
         {
             await MinioBucketHandler(bucketName);
 
-            var response= await _minioClient.PutObjectAsync(new PutObjectArgs()
+            var response = await _minioClient.PutObjectAsync(new PutObjectArgs()
                 .WithBucket(bucketName)
                 .WithObject(processedImageName)
                 .WithStreamData(outputStream)
@@ -93,5 +91,23 @@ namespace CoreAdapters.Services
             }
         }
 
+
+        private void Connect()
+        {
+            string endpoint = Environment.GetEnvironmentVariable("MINIO_ENDPOINT") ?? throw new InvalidOperationException("The MINIO_SECRET_KEY environment variable is not set or is null.");
+            string accessKey = Environment.GetEnvironmentVariable("MINIO_ACCESS_KEY") ?? throw new InvalidOperationException("The MINIO_ACCESS_KEY environment variable is not set or is null.");
+            string secretKey = Environment.GetEnvironmentVariable("MINIO_SECRET_KEY") ?? throw new InvalidOperationException("The MINIO_SECRET_KEY environment variable is not set or is null.");
+            bool useSSL = bool.TryParse(Environment.GetEnvironmentVariable("MINIO_USE_SSL") ?? throw new InvalidOperationException("The MINIO_USE_SSL environment variable is not set or is null."), out useSSL);
+
+
+
+            _minioClient = new MinioClient()
+                                .WithEndpoint(endpoint)
+                                    .WithCredentials(accessKey, secretKey)
+                                    .WithTimeout(TimeSpan.FromMinutes(5).Minutes)
+                                    .WithSSL(false)
+                                    .Build();
+
+        }
     }
 }
