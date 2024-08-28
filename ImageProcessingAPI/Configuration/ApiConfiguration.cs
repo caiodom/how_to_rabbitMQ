@@ -35,7 +35,7 @@ namespace ImageProcessingAPI.Configuration
             services.AddScoped<IFileValidator, FileValidator>();
             services.AddScoped<IImageProcessingService, ImageProcessingService>();
 
-            services.AddMinioConfigurations();
+
             services.AddRabbitMQConfigurations();
 
             services.AddEndpointsApiExplorer();
